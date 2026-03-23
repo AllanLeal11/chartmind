@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChartMind — AI Trading Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060810; --surface: #0d1117; --border: #1e2a3a;
+    --accent: #00e5ff; --gold: #ffd166; --green: #06d6a0;
+    --red: #ef476f; --text: #e8edf5; --muted: #5a6a80;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Space Mono', monospace; min-height: 100vh; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .orb { position: fixed; border-radius: 50%; filter: blur(100px); pointer-events: none; z-index: 0; }
+  .orb1 { width: 500px; height: 500px; background: rgba(0,229,255,0.06); top: -100px; right: -100px; }
+  .orb2 { width: 400px; height: 400px; background: rgba(255,107,53,0.05); bottom: 0; left: -100px; }
+
+  header {
+    position: relative; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 40px; border-bottom: 1px solid var(--border);
+  }
+  .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; }
+  .logo span { color: var(--accent); }
+  .badge { background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.3); color: var(--accent); font-size: 11px; padding: 4px 12px; border-radius: 20px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .hero { position: relative; z-index: 10; text-align: center; padding: 50px 20px 30px; }
+  .hero-tag { display: inline-block; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); margin-bottom: 16px; }
+  .hero h1 { font-family: 'Syne', sans-serif; font-size: clamp(32px, 5vw, 60px); font-weight: 800; line-height: 1.1; letter-spacing: -2px; margin-bottom: 12px; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { font-size: 14px; color: var(--muted); max-width: 460px; margin: 0 auto; line-height: 1.7; }
+
+  .main-card { position: relative; z-index: 10; max-width: 860px; margin: 30px auto; padding: 0 20px 60px; }
+
+  /* PRICE TICKER */
+  .price-ticker {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 24px; margin-bottom: 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ticker-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .ticker-price { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: var(--accent); }
+  .ticker-info { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .ticker-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse-dot 1.5s infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+
+  .options-row { display: flex; gap: 10px; margin: 16px 0; flex-wrap: wrap; }
+  .opt-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: block; }
+  .tf-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 12px; transition: all 0.2s; }
+  .tf-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .tf-btn.active { background: rgba(0,229,255,0.1); border-color: var(--accent); color: var(--accent); }
+
+  .analyze-btn {
+    width: 100%; padding: 18px; background: var(--accent); color: #000;
+    border: none; border-radius: 12px; font-family: 'Syne', sans-serif;
+    font-size: 16px; font-weight: 700; letter-spacing: 1px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.3s; margin-top: 16px;
+  }
+  .analyze-btn:hover { background: #33ecff; transform: translateY(-1px); box-shadow: 0 10px 40px rgba(0,229,255,0.3); }
+  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .loading-state { display: none; text-align: center; padding: 50px; }
+  .scanner { width: 80px; height: 80px; margin: 0 auto 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+  .loading-state p { font-size: 13px; color: var(--muted); animation: pulse 1.5s ease infinite; }
+
+  .error-box { display: none; background: rgba(239,71,111,0.08); border: 1px solid rgba(239,71,111,0.3); border-radius: 12px; padding: 16px 20px; margin-top: 16px; font-size: 13px; color: #ef476f; line-height: 1.6; }
+
+  .results-zone { display: none; margin-top: 24px; animation: fadeUp 0.5s ease forwards; }
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .results-header h2 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; }
+  .timestamp { font-size: 11px; color: var(--muted); }
+
+  .bias-banner { border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 16px; margin-bottom: 16px; border: 1px solid; }
+  .bias-banner.bullish { background: rgba(6,214,160,0.08); border-color: rgba(6,214,160,0.3); }
+  .bias-banner.bearish { background: rgba(239,71,111,0.08); border-color: rgba(239,71,111,0.3); }
+  .bias-banner.neutral  { background: rgba(255,209,102,0.08); border-color: rgba(255,209,102,0.3); }
+  .bias-icon { font-size: 32px; }
+  .bias-text h3 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+  .bias-banner.bullish .bias-text h3 { color: var(--green); }
+  .bias-banner.bearish .bias-text h3 { color: var(--red); }
+  .bias-banner.neutral  .bias-text h3 { color: var(--gold); }
+  .bias-text p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .trade-setup { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .trade-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+  .trade-item { text-align: center; }
+  .trade-item .label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .trade-item .value { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
+  .entry-val { color: var(--accent); } .sl-val { color: var(--red); } .tp-val { color: var(--green); }
+  .rr-badge { display: inline-block; background: rgba(255,209,102,0.1); border: 1px solid rgba(255,209,102,0.3); color: var(--gold); font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-top: 14px; }
+
+  .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  @media(max-width:600px){ .results-grid { grid-template-columns: 1fr; } }
+  .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .result-card-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .result-card-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .result-card h4 { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .result-card p { font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+  .zones-list { list-style: none; margin-top: 10px; }
+  .zones-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .zones-list li:last-child { border-bottom: none; }
+  .zone-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .full-analysis { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .full-analysis-text { font-size: 13px; color: #a0aec0; line-height: 1.9; white-space: pre-wrap; }
+  .typing::after { content: '▋'; animation: blink 0.7s infinite; color: var(--accent); }
+
+  .meta-info { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .meta-chip { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 11px; color: var(--muted); }
+  .meta-chip span { color: var(--accent); font-weight: 700; }
+
+  footer { position: relative; z-index: 10; text-align: center; padding: 30px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<header>
+  <div class="logo">Chart<span>Mind</span></div>
+  <span class="badge">SMC · Live Data</span>
+</header>
+
+<section class="hero">
+  <div class="hero-tag">⚡ Datos en vivo · Smart Money Concepts</div>
+  <h1>Análisis SMC<br>con <em>datos reales</em></h1>
+  <p>Selecciona instrumento y timeframe. La IA descarga las velas en tiempo real y te da el análisis completo.</p>
+</section>
+
+<div class="main-card">
+
+  <!-- LIVE PRICE -->
+  <div class="price-ticker">
+    <div>
+      <div class="ticker-label">Precio actual</div>
+      <div class="ticker-price" id="tickerPrice">—</div>
+      <div class="ticker-info" id="tickerInfo">Selecciona instrumento</div>
+    </div>
+    <div class="ticker-dot" id="tickerDot" style="opacity:0.3"></div>
+  </div>
+
+  <!-- TIMEFRAME -->
+  <span class="opt-label">Timeframe</span>
+  <div class="options-row" id="tfSelector">
+    <button class="tf-btn" data-tf="M1">M1</button>
+    <button class="tf-btn active" data-tf="M5">M5</button>
+    <button class="tf-btn" data-tf="M15">M15</button>
+    <button class="tf-btn" data-tf="H1">H1</button>
+    <button class="tf-btn" data-tf="H4">H4</button>
+    <button class="tf-btn" data-tf="D1">D1</button>
+  </div>
+
+  <!-- INSTRUMENT -->
+  <span class="opt-label">Instrumento</span>
+  <div class="options-row" id="instrSelector">
+    <button class="tf-btn active" data-instr="XAU/USD">XAU/USD 🥇</button>
+    <button class="tf-btn" data-instr="EUR/USD">EUR/USD</button>
+    <button class="tf-btn" data-instr="BTC/USD">BTC/USD</button>
+    <button class="tf-btn" data-instr="NAS100">NAS100</button>
+  </div>
+
+  <button class="analyze-btn" id="analyzeBtn">⚡ ANALIZAR EN VIVO</button>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div class="loading-state" id="loadingState">
+    <div class="scanner"></div>
+    <p id="loadingMsg">Descargando velas en tiempo real...</p>
+  </div>
+
+  <div class="results-zone" id="resultsZone">
+    <div class="results-header">
+      <h2>📋 Análisis Completo</h2>
+      <span class="timestamp" id="analysisTime">—</span>
+    </div>
+
+    <div class="meta-info">
+      <div class="meta-chip">Instrumento: <span id="metaSymbol">—</span></div>
+      <div class="meta-chip">Timeframe: <span id="metaTF">—</span></div>
+      <div class="meta-chip">Velas analizadas: <span id="metaCandles">—</span></div>
+      <div class="meta-chip">Precio: <span id="metaPrice">—</span></div>
+    </div>
+
+    <div class="bias-banner" id="biasBanner">
+      <div class="bias-icon" id="biasIcon">—</div>
+      <div class="bias-text">
+        <h3 id="biasText">—</h3>
+        <p id="biasDesc">—</p>
+      </div>
+    </div>
+
+    <div class="trade-setup">
+      <span class="result-card-label">Setup sugerido</span>
+      <div class="trade-row">
+        <div class="trade-item"><div class="label">Entry</div><div class="value entry-val" id="entryVal">—</div></div>
+        <div class="trade-item"><div class="label">Stop Loss</div><div class="value sl-val" id="slVal">—</div></div>
+        <div class="trade-item"><div class="label">Take Profit</div><div class="value tp-val" id="tpVal">—</div></div>
+      </div>
+      <div style="text-align:center"><span class="rr-badge" id="rrBadge">R:R —</span></div>
+    </div>
+
+    <div class="results-grid">
+      <div class="result-card">
+        <div class="result-card-label">Estructura</div>
+        <h4 id="structureTitle">—</h4>
+        <p id="structureDesc">—</p>
+      </div>
+      <div class="result-card">
+        <div class="result-card-label">Zonas Clave</div>
+        <ul class="zones-list" id="zonesList"></ul>
+      </div>
+    </div>
+
+    <div class="full-analysis">
+      <span class="result-card-label">Análisis detallado</span>
+      <div class="full-analysis-text typing" id="fullAnalysisText"></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>CHARTMIND · AI TRADING ANALYSIS · SMART MONEY CONCEPTS ENGINE</footer>
+
+<script>
+const API_ENDPOINT = '/api/analyze';
+let selectedTF = 'M5';
+let selectedInstr = 'XAU/USD';
+
+document.getElementById('tfSelector').addEventListener('click', e => {
+  if (!e.target.dataset.tf) return;
+  document.querySelectorAll('#tfSelector .tf-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  selectedTF = e.target.dataset.tf;
+});
+
+document.getElementById('instrSelector').addEventListener('click', e => {
+  if (!e.target.dataset.instr) return;
+  document.querySelectorAll('#instrSelector .tf-btn').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  selectedInstr = e.target.dataset.instr;
+  document.getElementById('tickerInfo').textContent = 'Selecciona timeframe y analiza';
+});
+
+document.getElementById('analyzeBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  document.getElementById('loadingState').style.display = 'block';
+  document.getElementById('resultsZone').style.display = 'none';
+  document.getElementById('errorBox').style.display = 'none';
+
+  const msgs = [
+    'Descargando velas en tiempo real...',
+    'Procesando estructura de mercado...',
+    'Identificando BOS y CHoCH...',
+    'Detectando Order Blocks y FVGs...',
+    'Calculando setup óptimo...',
+    'Generando análisis final...'
+  ];
+  let mi = 0;
+  const msgInterval = setInterval(() => {
+    mi = (mi + 1) % msgs.length;
+    document.getElementById('loadingMsg').textContent = msgs[mi];
+  }, 1500);
+
+  try {
+    const res = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timeframe: selectedTF, instrument: selectedInstr })
+    });
+
+    clearInterval(msgInterval);
+    const json = await res.json();
+
+    if (!json.success || !json.analysis) throw new Error(json.error || 'Error desconocido');
+
+    renderResults(json.analysis);
+
+  } catch (err) {
+    clearInterval(msgInterval);
+    document.getElementById('loadingState').style.display = 'none';
+    btn.disabled = false;
+    document.getElementById('errorBox').style.display = 'block';
+    document.getElementById('errorBox').textContent = '⚠️ ' + err.message;
+  }
+});
+
+function renderResults(d) {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('resultsZone').style.display = 'block';
+  document.getElementById('analyzeBtn').disabled = false;
+
+  // Update ticker
+  if (d.currentPrice) {
+    document.getElementById('tickerPrice').textContent = d.currentPrice;
+    document.getElementById('tickerInfo').textContent = d.symbol + ' · ' + d.interval;
+    document.getElementById('tickerDot').style.opacity = '1';
+  }
+
+  // Meta
+  document.getElementById('analysisTime').textContent = new Date().toLocaleTimeString('es-CR', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('metaSymbol').textContent = d.symbol || selectedInstr;
+  document.getElementById('metaTF').textContent = selectedTF;
+  document.getElementById('metaCandles').textContent = d.candlesAnalyzed || '—';
+  document.getElementById('metaPrice').textContent = d.currentPrice || '—';
+
+  // Bias
+  const banner = document.getElementById('biasBanner');
+  const bc = d.bias === 'BULLISH' ? 'bullish' : d.bias === 'BEARISH' ? 'bearish' : 'neutral';
+  banner.className = 'bias-banner ' + bc;
+  document.getElementById('biasIcon').textContent = d.bias === 'BULLISH' ? '📈' : d.bias === 'BEARISH' ? '📉' : '↔️';
+  document.getElementById('biasText').textContent = (d.bias || '—') + ' BIAS';
+  document.getElementById('biasDesc').textContent = d.biasDescription || '';
+
+  // Setup
+  document.getElementById('entryVal').textContent = d.entry || '—';
+  document.getElementById('slVal').textContent = d.sl || '—';
+  document.getElementById('tpVal').textContent = d.tp || '—';
+  document.getElementById('rrBadge').textContent = 'R:R ' + (d.rr || '—');
+
+  // Structure
+  document.getElementById('structureTitle').textContent = d.structureTitle || '—';
+  document.getElementById('structureDesc').textContent = d.structureDesc || '—';
+
+  // Zones
+  const zList = document.getElementById('zonesList');
+  zList.innerHTML = '';
+  const zColors = { OB_BULL:'#06d6a0', OB_BEAR:'#ef476f', FVG:'#00e5ff', SUPPORT:'#ffd166', RESISTANCE:'#ff6b35', LIQUIDITY:'#a78bfa' };
+  (d.zones || []).slice(0, 5).forEach(z => {
+    const li = document.createElement('li');
+    const c = zColors[z.type] || '#5a6a80';
+    li.innerHTML = `<span class="zone-dot" style="background:${c}"></span><span style="color:${c};font-weight:700">${z.type}</span><span style="color:#5a6a80">|</span><span>${z.name}</span><span style="margin-left:auto;color:#a0aec0">${z.price||''}</span>`;
+    zList.appendChild(li);
+  });
+
+  // Full analysis typewriter
+  const el = document.getElementById('fullAnalysisText');
+  el.textContent = ''; el.classList.add('typing');
+  const text = d.fullAnalysis || 'Sin análisis disponible.';
+  let i = 0;
+  const typer = setInterval(() => {
+    el.textContent += text[i++];
+    if (i >= text.length) { clearInterval(typer); el.classList.remove('typing'); }
+  }, 16);
+}
+</script>
+</body>
+</html>
