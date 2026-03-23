@@ -28,73 +28,56 @@ class handler(BaseHTTPRequestHandler):
             self._json(400, {'error': 'Falta el campo image'})
             return
 
-        api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+        api_key = os.environ.get('GEMINI_API_KEY', '')
         if not api_key:
-            self._json(500, {'error': 'API key no configurada en Vercel Environment Variables'})
+            self._json(500, {'error': 'API key no configurada. Agrega GEMINI_API_KEY en Vercel Environment Variables'})
             return
 
         prompt = f"""Eres un experto trader que usa Smart Money Concepts (SMC).
-Analiza este gráfico de {instrument} en timeframe {timeframe}.
-
-Responde SOLO con un objeto JSON válido, sin texto extra, sin markdown, sin backticks.
-Usa esta estructura exacta:
-
-{{
-  "bias": "BULLISH o BEARISH o NEUTRAL",
-  "biasDescription": "frase corta de 1 línea explicando el sesgo",
-  "structureTitle": "título corto de la estructura",
-  "structureDesc": "2 líneas sobre la estructura de mercado visible",
-  "entry": "precio o zona de entrada sugerida",
-  "sl": "precio stop loss",
-  "tp": "precio take profit",
-  "rr": "ratio riesgo-beneficio (ej: 1:3.2)",
-  "zones": [
-    {{"name": "descripción", "type": "OB_BULL|OB_BEAR|FVG|SUPPORT|RESISTANCE|LIQUIDITY", "price": "nivel aproximado"}}
-  ],
-  "fullAnalysis": "Análisis completo de 250-350 palabras en español sobre estructura BOS/CHoCH, order blocks, FVGs, liquidez, confluencias, condiciones de entrada y gestión del trade."
-}}"""
+Analiza este grafico de {instrument} en timeframe {timeframe}.
+Responde SOLO con JSON valido, sin texto extra, sin markdown, sin backticks.
+Estructura exacta:
+{{"bias":"BULLISH o BEARISH o NEUTRAL","biasDescription":"frase corta","structureTitle":"titulo corto","structureDesc":"2 lineas","entry":"precio entrada","sl":"stop loss","tp":"take profit","rr":"ej 1:3.2","zones":[{{"name":"desc","type":"OB_BULL|OB_BEAR|FVG|SUPPORT|RESISTANCE|LIQUIDITY","price":"nivel"}}],"fullAnalysis":"Analisis 250-350 palabras en espanol: BOS/CHoCH, order blocks, FVGs, liquidez, confluencias, entrada y gestion del trade."}}"""
 
         payload = json.dumps({
-            'model': 'claude-sonnet-4-20250514',
-            'max_tokens': 1200,
-            'messages': [{
-                'role': 'user',
-                'content': [
-                    {'type': 'image', 'source': {'type': 'base64', 'media_type': media_type, 'data': image}},
-                    {'type': 'text', 'text': prompt}
-                ]
-            }]
+            "contents": [{"parts": [
+                {"inline_data": {"mime_type": media_type, "data": image}},
+                {"text": prompt}
+            ]}],
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1500}
         }).encode('utf-8')
 
-        req = urllib.request.Request(
-            'https://api.anthropic.com/v1/messages',
-            data=payload,
-            headers={
-                'Content-Type': 'application/json',
-                'x-api-key': api_key,
-                'anthropic-version': '2023-06-01'
-            },
-            method='POST'
-        )
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+
+        req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
 
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 data = json.loads(resp.read())
         except urllib.error.HTTPError as e:
-            err = json.loads(e.read()).get('error', {}).get('message', str(e))
-            self._json(502, {'error': err})
+            err_body = e.read().decode('utf-8', errors='ignore')
+            try:
+                err_msg = json.loads(err_body).get('error', {}).get('message', err_body)
+            except Exception:
+                err_msg = err_body
+            self._json(502, {'error': err_msg})
             return
         except Exception as e:
             self._json(502, {'error': str(e)})
             return
 
-        raw = data.get('content', [{}])[0].get('text', '')
-        raw = raw.replace('```json', '').replace('```', '').strip()
+        try:
+            raw = data['candidates'][0]['content']['parts'][0]['text']
+        except (KeyError, IndexError):
+            self._json(500, {'error': 'Respuesta inesperada de Gemini', 'raw': str(data)})
+            return
+
+        raw = raw.replace('```json','').replace('```','').strip()
 
         try:
             analysis = json.loads(raw)
         except Exception:
-            self._json(500, {'error': 'Respuesta inesperada de la IA', 'raw': raw})
+            self._json(500, {'error': 'Formato inesperado', 'raw': raw})
             return
 
         self._json(200, {'success': True, 'analysis': analysis})
