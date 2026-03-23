@@ -45,7 +45,7 @@ Responde SOLO JSON sin texto extra ni backticks:
             "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1500}
         }).encode('utf-8')
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
         req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
 
         try:
