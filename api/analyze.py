@@ -38,7 +38,7 @@ Responde SOLO JSON sin texto extra ni backticks:
 {{"bias":"BULLISH o BEARISH o NEUTRAL","biasDescription":"frase corta","structureTitle":"titulo","structureDesc":"2 lineas","entry":"precio","sl":"stop loss","tp":"take profit","rr":"1:3.0","zones":[{{"name":"desc","type":"OB_BULL","price":"nivel"}}],"fullAnalysis":"250 palabras en espanol sobre BOS CHoCH OB FVG liquidez entrada y gestion"}}"""
 
         payload = json.dumps({
-            "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+            "model": "llama-3.2-11b-vision-preview",
             "max_tokens": 1500,
             "messages": [{
                 "role": "user",
