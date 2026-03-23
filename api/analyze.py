@@ -28,9 +28,9 @@ class handler(BaseHTTPRequestHandler):
             self._json(400, {'error': 'Falta imagen'})
             return
 
-        api_key = os.environ.get('GEMINI_API_KEY', '')
+        api_key = os.environ.get('OPENAI_API_KEY', '')
         if not api_key:
-            self._json(500, {'error': 'Agrega GEMINI_API_KEY en Vercel Environment Variables'})
+            self._json(500, {'error': 'Agrega OPENAI_API_KEY en Vercel Environment Variables'})
             return
 
         prompt = f"""Eres experto trader SMC. Analiza el grafico de {instrument} timeframe {timeframe}.
@@ -38,15 +38,26 @@ Responde SOLO JSON sin texto extra ni backticks:
 {{"bias":"BULLISH o BEARISH o NEUTRAL","biasDescription":"frase corta","structureTitle":"titulo","structureDesc":"2 lineas","entry":"precio","sl":"stop loss","tp":"take profit","rr":"1:3.0","zones":[{{"name":"desc","type":"OB_BULL","price":"nivel"}}],"fullAnalysis":"250 palabras en espanol sobre BOS CHoCH OB FVG liquidez entrada y gestion"}}"""
 
         payload = json.dumps({
-            "contents": [{"parts": [
-                {"inline_data": {"mime_type": media_type, "data": image}},
-                {"text": prompt}
-            ]}],
-            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1500}
+            "model": "gpt-4o",
+            "max_tokens": 1500,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{image}"}},
+                    {"type": "text", "text": prompt}
+                ]
+            }]
         }).encode('utf-8')
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-        req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+        req = urllib.request.Request(
+            'https://api.openai.com/v1/chat/completions',
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}'
+            },
+            method='POST'
+        )
 
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
@@ -64,7 +75,7 @@ Responde SOLO JSON sin texto extra ni backticks:
             return
 
         try:
-            raw = data['candidates'][0]['content']['parts'][0]['text']
+            raw = data['choices'][0]['message']['content']
         except (KeyError, IndexError):
             self._json(500, {'error': 'Respuesta inesperada', 'raw': str(data)})
             return
