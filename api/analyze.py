@@ -28,9 +28,9 @@ class handler(BaseHTTPRequestHandler):
             self._json(400, {'error': 'Falta imagen'})
             return
 
-        api_key = os.environ.get('OPENAI_API_KEY', '')
+        api_key = os.environ.get('GROQ_API_KEY', '')
         if not api_key:
-            self._json(500, {'error': 'Agrega OPENAI_API_KEY en Vercel Environment Variables'})
+            self._json(500, {'error': 'Agrega GROQ_API_KEY en Vercel Environment Variables'})
             return
 
         prompt = f"""Eres experto trader SMC. Analiza el grafico de {instrument} timeframe {timeframe}.
@@ -38,7 +38,7 @@ Responde SOLO JSON sin texto extra ni backticks:
 {{"bias":"BULLISH o BEARISH o NEUTRAL","biasDescription":"frase corta","structureTitle":"titulo","structureDesc":"2 lineas","entry":"precio","sl":"stop loss","tp":"take profit","rr":"1:3.0","zones":[{{"name":"desc","type":"OB_BULL","price":"nivel"}}],"fullAnalysis":"250 palabras en espanol sobre BOS CHoCH OB FVG liquidez entrada y gestion"}}"""
 
         payload = json.dumps({
-            "model": "gpt-4o",
+            "model": "meta-llama/llama-4-scout-17b-16e-instruct",
             "max_tokens": 1500,
             "messages": [{
                 "role": "user",
@@ -50,7 +50,7 @@ Responde SOLO JSON sin texto extra ni backticks:
         }).encode('utf-8')
 
         req = urllib.request.Request(
-            'https://api.openai.com/v1/chat/completions',
+            'https://api.groq.com/openai/v1/chat/completions',
             data=payload,
             headers={
                 'Content-Type': 'application/json',
